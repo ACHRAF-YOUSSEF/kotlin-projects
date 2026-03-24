@@ -49,7 +49,7 @@ fun NotesListScreen(
 ) {
     val selectedIds = state.selectedIds
     val notes = state.notes
-    
+
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
