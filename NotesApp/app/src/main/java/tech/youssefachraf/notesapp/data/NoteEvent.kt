@@ -7,4 +7,6 @@ sealed interface NoteEvent {
     data class SetContent(val content: String) : NoteEvent
 
     data class DeleteNote(val note: Note) : NoteEvent
+
+    object AddNewEmptyNote : NoteEvent
 }

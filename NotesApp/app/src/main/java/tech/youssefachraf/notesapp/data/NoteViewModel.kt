@@ -12,12 +12,14 @@ import kotlinx.coroutines.launch
 class NoteViewModel(
     private val dao: NoteDao
 ) : ViewModel() {
+    private val _selectedIds = MutableStateFlow<Set<Int>>(emptySet())
     private val _notes = MutableStateFlow<List<Note>>(emptyList())
     private val _state = MutableStateFlow(NoteState())
 
-    val state = combine(_state, _notes) { state, notes ->
+    val state = combine(_state, _notes, _selectedIds) { state, notes, selectedIds ->
         state.copy(
-            notes = notes
+            notes = notes,
+            selectedIds = selectedIds
         )
     }.stateIn(
         viewModelScope,
@@ -43,6 +45,18 @@ class NoteViewModel(
                 _state.update {
                     it.copy(content = event.content)
                 }
+            }
+
+            is NoteEvent.AddNewEmptyNote -> {
+                _state.update {
+                    it.copy(
+                        title = "",
+                        content = "",
+                        noteId = null
+                    )
+                }
+
+                onEvent(NoteEvent.SaveNote)
             }
 
             NoteEvent.SaveNote -> {
