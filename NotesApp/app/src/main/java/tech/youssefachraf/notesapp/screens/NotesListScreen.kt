@@ -32,7 +32,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tech.youssefachraf.notesapp.data.Note
-import tech.youssefachraf.notesapp.data.NoteEvent
 import tech.youssefachraf.notesapp.data.NoteState
 import tech.youssefachraf.notesapp.ui.theme.NeutralColor
 import tech.youssefachraf.notesapp.ui.theme.PrimaryColor
@@ -43,7 +42,7 @@ import tech.youssefachraf.notesapp.ui.theme.TextSecondary
 @Composable
 fun NotesListScreen(
     state: NoteState,
-    onEvent: (NoteEvent) -> Unit,
+    onAddNoteClick: () -> Unit = {},
     onLongPress: (Note) -> Unit = {},
     onNoteClick: (Note) -> Unit = {},
 ) {
@@ -54,7 +53,7 @@ fun NotesListScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    onEvent(NoteEvent.AddNewEmptyNote)
+                    onAddNoteClick()
                 },
                 containerColor = PrimaryColor,
                 contentColor = Color.White,
@@ -88,7 +87,9 @@ fun NotesListScreen(
                             onLongPress = {
                                 onLongPress(note)
                             },
-                            onClick = { onNoteClick(note) }
+                            onClick = {
+                                onNoteClick(note)
+                            }
                         )
                     }
                 }

@@ -12,7 +12,7 @@ interface NoteDao {
     fun getNotes(): Flow<List<Note>>
 
     @Upsert
-    suspend fun upsert(note: Note)
+    suspend fun upsert(note: Note): Long
 
     @Delete
     suspend fun delete(note: Note)

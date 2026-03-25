@@ -13,7 +13,11 @@ class NoteViewModel(
     private val dao: NoteDao
 ) : ViewModel() {
     private val _selectedIds = MutableStateFlow<Set<Int>>(emptySet())
-    private val _notes = MutableStateFlow<List<Note>>(emptyList())
+    private val _notes = dao.getNotes().stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(),
+        emptyList()
+    )
     private val _state = MutableStateFlow(NoteState())
 
     val state = combine(_state, _notes, _selectedIds) { state, notes, selectedIds ->
@@ -39,19 +43,21 @@ class NoteViewModel(
                 _state.update {
                     it.copy(title = event.title)
                 }
+                persistNote()
             }
 
             is NoteEvent.SetContent -> {
                 _state.update {
                     it.copy(content = event.content)
                 }
+                persistNote()
             }
 
             is NoteEvent.AddNewEmptyNote -> {
                 _state.update {
                     it.copy(
-                        title = "",
-                        content = "",
+                        title = "test",
+                        content = "test",
                         noteId = null
                     )
                 }
@@ -59,29 +65,43 @@ class NoteViewModel(
                 onEvent(NoteEvent.SaveNote)
             }
 
-            NoteEvent.SaveNote -> {
-                val title = state.value.title
-                val content = state.value.content
-
-                if (title.isBlank() || content.isBlank()) {
-                    return
-                }
-
-                viewModelScope.launch {
-                    dao.upsert(
-                        Note(
-                            title = title,
-                            content = content
-                        )
-                    )
-                }
-
+            is NoteEvent.StartEditingNote -> {
                 _state.update {
                     it.copy(
-                        title = "",
-                        content = "",
-                        noteId = null
+                        title = event.note.title,
+                        content = event.note.content,
+                        noteId = event.note.id
                     )
+                }
+            }
+
+            NoteEvent.SaveNote -> {
+                persistNote()
+            }
+        }
+    }
+
+    private fun persistNote() {
+        val currentState = _state.value
+        val title = currentState.title.trim()
+        val content = currentState.content.trim()
+
+        if (title.isEmpty() && content.isEmpty()) {
+            return
+        }
+
+        viewModelScope.launch {
+            val rowId = dao.upsert(
+                Note(
+                    id = currentState.noteId ?: 0,
+                    title = currentState.title,
+                    content = currentState.content,
+                )
+            )
+
+            if (currentState.noteId == null && rowId > 0) {
+                _state.update {
+                    it.copy(noteId = rowId.toInt())
                 }
             }
         }
