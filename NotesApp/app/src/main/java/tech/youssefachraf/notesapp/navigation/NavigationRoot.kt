@@ -1,5 +1,6 @@
 package tech.youssefachraf.notesapp.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.navigation3.runtime.NavEntry
@@ -28,6 +29,12 @@ fun NavigationRoot(
             when (key) {
                 is Route.NotesListScreen -> {
                     NavEntry(key) {
+                        val isSelectionMode = noteState.value.isSelectionMode
+
+                        BackHandler(enabled = isSelectionMode) {
+                            onEvent(NoteEvent.ClearSelection)
+                        }
+
                         NotesListScreen(
                             state = noteState.value,
                             onAddNoteClick = {
@@ -35,11 +42,21 @@ fun NavigationRoot(
                                 backStack.add(Route.EditNoteScreen(Note()))
                             },
                             onLongPress = {
-
+                                onEvent(NoteEvent.ToggleSelection(it.id))
+                            },
+                            onToggleAllClick = {
+                                onEvent(NoteEvent.ToggleSelectAll)
+                            },
+                            onDeleteSelectedClick = {
+                                onEvent(NoteEvent.DeleteSelected)
                             },
                             onNoteClick = {
-                                onEvent(NoteEvent.StartEditingNote(it))
-                                backStack.add(Route.EditNoteScreen(it))
+                                if (isSelectionMode) {
+                                    onEvent(NoteEvent.ToggleSelection(it.id))
+                                } else {
+                                    onEvent(NoteEvent.StartEditingNote(it))
+                                    backStack.add(Route.EditNoteScreen(it))
+                                }
                             }
                         )
                     }
@@ -50,6 +67,10 @@ fun NavigationRoot(
                         EditNoteScreen(
                             state = noteState.value,
                             onBack = {
+                                backStack.removeLastOrNull()
+                            },
+                            onDeleteClick = {
+                                onEvent(NoteEvent.DeleteNote(key.note))
                                 backStack.removeLastOrNull()
                             },
                             onEvent = onEvent,

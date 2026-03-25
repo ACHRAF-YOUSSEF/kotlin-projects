@@ -21,9 +21,12 @@ class NoteViewModel(
     private val _state = MutableStateFlow(NoteState())
 
     val state = combine(_state, _notes, _selectedIds) { state, notes, selectedIds ->
+        val noteIds = notes.mapTo(hashSetOf()) { it.id }
+        val validSelectedIds = selectedIds.intersect(noteIds)
+
         state.copy(
             notes = notes,
-            selectedIds = selectedIds
+            selectedIds = validSelectedIds
         )
     }.stateIn(
         viewModelScope,
@@ -37,6 +40,43 @@ class NoteViewModel(
                 viewModelScope.launch {
                     dao.delete(event.note)
                 }
+            }
+
+            is NoteEvent.ToggleSelection -> {
+                _selectedIds.update { selected ->
+                    if (selected.contains(event.noteId)) {
+                        selected - event.noteId
+                    } else {
+                        selected + event.noteId
+                    }
+                }
+            }
+
+            NoteEvent.ToggleSelectAll -> {
+                val notes = state.value.notes
+                _selectedIds.update { selected ->
+                    if (notes.isNotEmpty() && selected.size == notes.size) {
+                        emptySet()
+                    } else {
+                        notes.mapTo(mutableSetOf()) { it.id }
+                    }
+                }
+            }
+
+            NoteEvent.DeleteSelected -> {
+                val ids = _selectedIds.value.toList()
+                if (ids.isEmpty()) {
+                    return
+                }
+
+                viewModelScope.launch {
+                    dao.deleteMultiple(ids)
+                    _selectedIds.value = emptySet()
+                }
+            }
+
+            NoteEvent.ClearSelection -> {
+                _selectedIds.value = emptySet()
             }
 
             is NoteEvent.SetTitle -> {

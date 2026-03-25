@@ -8,6 +8,14 @@ sealed interface NoteEvent {
 
     data class DeleteNote(val note: Note) : NoteEvent
 
+    data class ToggleSelection(val noteId: Int) : NoteEvent
+
+    object ToggleSelectAll : NoteEvent
+
+    object DeleteSelected : NoteEvent
+
+    object ClearSelection : NoteEvent
+
     data class StartEditingNote(val note: Note) : NoteEvent
 
     object AddNewEmptyNote : NoteEvent
