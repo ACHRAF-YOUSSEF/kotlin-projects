@@ -49,6 +49,9 @@ fun NavigationRoot(
                     NavEntry(key) {
                         EditNoteScreen(
                             state = noteState.value,
+                            onBack = {
+                                backStack.removeLastOrNull()
+                            },
                             onEvent = onEvent,
                         )
                     }
