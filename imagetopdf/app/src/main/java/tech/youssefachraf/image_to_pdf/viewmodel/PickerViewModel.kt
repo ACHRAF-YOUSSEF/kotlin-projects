@@ -29,7 +29,6 @@ data class PickerUiState(
     val selectedImages: List<Uri> = emptyList(),
     val pdfName: String = "",
     val showNameDialog: Boolean = false,
-    val showPreview: Boolean = false,
     val pickerState: PickerState = PickerState.Idle,
 )
 
@@ -51,10 +50,6 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun confirmSelection() {
-        _uiState.update { it.copy(showPreview = true) }
-    }
-
     fun moveImage(from: Int, to: Int) {
         _uiState.update { state ->
             val list = state.selectedImages.toMutableList()
@@ -66,11 +61,7 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun backToSelection() {
-        _uiState.update { it.copy(showPreview = false) }
-    }
-
-    fun confirmPreview() {
+    fun showNameDialog() {
         val defaultName = PdfConverter.generateDefaultFileName()
         _uiState.update { it.copy(pdfName = defaultName, showNameDialog = true) }
     }
@@ -138,9 +129,4 @@ class PickerViewModel(application: Application) : AndroidViewModel(application) 
     fun reset() {
         _uiState.update { PickerUiState() }
     }
-
-    fun resetState() {
-        _uiState.update { it.copy(pickerState = PickerState.Idle) }
-    }
 }
-
