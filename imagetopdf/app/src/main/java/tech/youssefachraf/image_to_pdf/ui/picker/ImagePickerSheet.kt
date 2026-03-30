@@ -8,12 +8,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,7 +25,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,14 +51,20 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -291,6 +299,15 @@ private fun PreviewReorderContent(
         lazyListState = lazyListState,
         onMove = { from, to -> onMove(from.index, to.index) }
     )
+    var previewUri by remember { mutableStateOf<Uri?>(null) }
+
+    previewUri?.let { uri ->
+        FullscreenImagePreview(
+            uri = uri,
+            pageLabel = "Page ${images.indexOf(uri) + 1}",
+            onDismiss = { previewUri = null },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -341,7 +358,8 @@ private fun PreviewReorderContent(
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            itemsIndexed(images, key = { _, uri -> uri.toString() }) { index, uri ->
+            items(images.size, key = { images[it].toString() }) { index ->
+                val uri = images[index]
                 ReorderableItem(reorderableState, key = uri.toString()) { isDragging ->
                     val elevation by animateDpAsState(
                         targetValue = if (isDragging) 8.dp else 1.dp,
@@ -377,12 +395,17 @@ private fun PreviewReorderContent(
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .size(64.dp)
-                                    .clip(RoundedCornerShape(10.dp)),
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { previewUri = uri },
                             )
 
                             Spacer(modifier = Modifier.width(12.dp))
 
-                            Column(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { previewUri = uri }
+                            ) {
                                 Text(
                                     "Page ${index + 1}",
                                     color = PrimaryText,
@@ -390,11 +413,9 @@ private fun PreviewReorderContent(
                                     fontSize = 15.sp,
                                 )
                                 Text(
-                                    uri.lastPathSegment?.substringAfterLast('/') ?: "Image",
-                                    color = SecondaryText,
+                                    "Tap to preview",
+                                    color = AccentBlue,
                                     fontSize = 12.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
 
@@ -519,3 +540,92 @@ private fun FileConflictDialog(
         }
     )
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Fullscreen image preview (pinch-to-zoom, tap anywhere to dismiss)
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun FullscreenImagePreview(
+    uri: Uri,
+    pageLabel: String,
+    onDismiss: () -> Unit,
+) {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.92f))
+                .pointerInput(Unit) {
+                    detectTapGestures { onDismiss() }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            // Close button
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .size(40.dp)
+                    .background(Color.White.copy(alpha = 0.15f), CircleShape),
+            ) {
+                Icon(Icons.Default.Close, "Close", tint = Color.White)
+            }
+
+            Text(
+                text = pageLabel,
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(20.dp),
+            )
+
+            // Zoomable image
+            AsyncImage(
+                model = uri,
+                contentDescription = "Full preview",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp)
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offset.x,
+                        translationY = offset.y,
+                    )
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(1f, 5f)
+                            if (scale > 1f) {
+                                offset = Offset(offset.x + pan.x, offset.y + pan.y)
+                            } else {
+                                offset = Offset.Zero
+                            }
+                        }
+                    },
+            )
+
+            // Hint at bottom
+            Text(
+                text = "Pinch to zoom · Tap to close",
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp),
+            )
+        }
+    }
+}
+
+

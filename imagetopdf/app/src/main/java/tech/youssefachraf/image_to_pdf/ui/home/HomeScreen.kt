@@ -2,6 +2,12 @@ package tech.youssefachraf.image_to_pdf.ui.home
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,16 +16,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.AlertDialog
@@ -33,20 +43,16 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,7 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import tech.youssefachraf.image_to_pdf.ui.home.components.PdfCard
 import tech.youssefachraf.image_to_pdf.ui.home.components.ToolGrid
 import tech.youssefachraf.image_to_pdf.ui.picker.ImagePickerSheet
@@ -82,11 +88,19 @@ fun HomeScreen(
     val uiState by homeViewModel.uiState.collectAsStateWithLifecycle()
     val pickerViewModel: PickerViewModel = viewModel()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     var showPickerSheet by remember { mutableStateOf(false) }
     var selectedNavIndex by remember { mutableIntStateOf(0) }
+
+    var successBannerUri by remember { mutableStateOf<Uri?>(null) }
+    var showSuccessBanner by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showSuccessBanner) {
+        if (showSuccessBanner) {
+            delay(4000L)
+            showSuccessBanner = false
+        }
+    }
 
     var renameTarget by remember { mutableStateOf<Pair<Uri, String>?>(null) }
     var renameText by remember { mutableStateOf("") }
@@ -173,13 +187,11 @@ fun HomeScreen(
                 )
             }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+            ) {
             item {
                 ToolGrid(
                     onImageToPdfClick = { showPickerSheet = true },
@@ -202,7 +214,7 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f),
                     )
                     Icon(
-                        Icons.Default.Sort,
+                        Icons.AutoMirrored.Filled.Sort,
                         "Sort",
                         tint = SecondaryText,
                         modifier = Modifier.size(20.dp),
@@ -242,6 +254,22 @@ fun HomeScreen(
             }
 
             item { Spacer(modifier = Modifier.height(80.dp)) }
+        }
+
+            AnimatedVisibility(
+                visible = showSuccessBanner,
+                enter = slideInVertically { -it } + fadeIn(),
+                exit = slideOutVertically { -it } + fadeOut(),
+                modifier = Modifier.align(Alignment.TopCenter),
+            ) {
+                SuccessBanner(
+                    onOpen = {
+                        showSuccessBanner = false
+                        successBannerUri?.let { openPdf(context, it) }
+                    },
+                    onDismiss = { showSuccessBanner = false },
+                )
+            }
         }
     }
 
@@ -284,17 +312,9 @@ fun HomeScreen(
                 val state = pickerViewModel.uiState.value.pickerState
                 if (state is PickerState.Success) {
                     homeViewModel.insertPdfAtTop(state.pdfInfo)
+                    successBannerUri = state.pdfInfo.uri
+                    showSuccessBanner = true
                     pickerViewModel.reset()
-                    scope.launch {
-                        val result = snackbarHostState.showSnackbar(
-                            message = "PDF saved successfully",
-                            actionLabel = "Open",
-                            duration = SnackbarDuration.Long,
-                        )
-                        if (result == SnackbarResult.ActionPerformed) {
-                            openPdf(context, state.pdfInfo.uri)
-                        }
-                    }
                 }
             },
         )
@@ -320,5 +340,41 @@ private fun sharePdf(context: android.content.Context, uri: Uri) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(shareIntent, null))
+}
+
+@Composable
+private fun SuccessBanner(
+    onOpen: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .background(Color(0xFF1A7F37), RoundedCornerShape(14.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Default.CheckCircle,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = "PDF saved successfully",
+            color = Color.White,
+            fontWeight = FontWeight.Medium,
+            fontSize = 14.sp,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onOpen) {
+            Text("Open", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        }
+        IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Default.Close, "Dismiss", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+        }
+    }
 }
 
