@@ -1,0 +1,3 @@
+[submodule "imagetopdf"]
+	path = imagetopdf
+	url = https://github.com/ACHRAF-YOUSSEF/imagetopdf.git
